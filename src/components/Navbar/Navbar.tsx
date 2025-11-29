@@ -10,13 +10,14 @@ const OrroNavbar: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
           {/* Logo */}
-          <a  href="/"> 
-          <div className="flex items-center space-x-2"   >
-            <img src={orro} alt="Orro Motors Logo" className="w-12 h-12" />
-            <span className="text-blue-500 text-xl font-semibold">
-              Orro Motors
-            </span>
-          </div></a>
+          <a href="/">
+            <div className="flex items-center space-x-2">
+              <img src={orro} alt="Orro Motors Logo" className="w-12 h-12" />
+              <span className="text-blue-500 text-xl font-semibold">
+                Orro Motors
+              </span>
+            </div>
+          </a>
 
           {/* Desktop Menu */}
           <div className="hidden md:flex space-x-12">
@@ -37,6 +38,12 @@ const OrroNavbar: React.FC = () => {
               className="text-gray-900 text-base font-medium hover:text-blue-500 transition"
             >
               Help
+            </a>
+            <a
+              href="/profile"
+              className="text-gray-900 text-base font-medium hover:text-blue-500 transition"
+            >
+              Profile
             </a>
           </div>
 
@@ -76,6 +83,12 @@ const OrroNavbar: React.FC = () => {
             className="block text-base font-medium hover:text-blue-200 transition"
           >
             Help
+          </a>
+          <a
+            href="/profile"
+            className="block text-base font-medium hover:text-blue-200 transition"
+          >
+            Profile
           </a>
         </div>
       )}

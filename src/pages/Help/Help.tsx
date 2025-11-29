@@ -45,7 +45,7 @@ const HelpScreen: React.FC = () => {
             Contact Information
           </h2>
           <div className="space-y-5">
-            <div className="flex items-start space-x-4">
+            {/* <div className="flex items-start space-x-4">
               <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
                 <Phone className="w-6 h-6 text-blue-600" />
               </div>
@@ -56,7 +56,7 @@ const HelpScreen: React.FC = () => {
                   Mon–Sun, 6:00 AM – 10:00 PM
                 </p>
               </div>
-            </div>
+            </div> */}
 
             <div className="flex items-start space-x-4">
               <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -64,7 +64,7 @@ const HelpScreen: React.FC = () => {
               </div>
               <div>
                 <p className="font-medium text-gray-900">Email</p>
-                <p className="text-gray-600">support@orromotors.com</p>
+                <p className="text-gray-600">orromottors@gmail.com</p>
                 <p className="text-sm text-gray-500 mt-1">
                   Response within 24 hours
                 </p>

@@ -156,7 +156,7 @@ export default function TripModals({
               </span>
               <br />
               <span className="font-medium">
-                {form.takeoff?.date} at {form.takeoff?.time}
+                {form.takeoff?.date} at {form?.departureTime}
               </span>
             </p>
             <div className="flex justify-center gap-6">
@@ -213,7 +213,7 @@ export default function TripModals({
               </span>{" "}
               at{" "}
               <span className="font-bold text-blue-600">
-                {form.takeoff?.time}
+                {form?.departureTime}
               </span>
             </p>
             <div className="flex justify-center gap-6">
@@ -395,21 +395,7 @@ export default function TripModals({
               />
             </div>
 
-            {/* Takeoff Time */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-800 mb-2">
-                Takeoff Time
-              </label>
-              <input
-                type="time"
-                value={form.takeoff?.time || ""}
-                onChange={(e) =>
-                  handleNestedChange("takeoff", "time", e.target.value)
-                }
-                className="w-full px-5 py-4 border-2 border-gray-300 rounded-2xl focus:ring-4 focus:ring-blue-300 outline-none transition text-lg"
-              />
-            </div>
-
+  
             {/* Arrival Time */}
             <div>
               <label className="block text-sm font-semibold text-gray-800 mb-2">
@@ -498,7 +484,7 @@ export default function TripModals({
                   <p className="flex items-center gap-3 text-lg">
                     <Clock className="w-6 h-6 text-purple-600" />
                     <strong className="w-32">Time:</strong>
-                    {viewingTrip.takeoff?.time}
+                    {viewingTrip?.departureTime}
                   </p>
                   <p className="flex items-center gap-3 text-lg">
                     <DollarSign className="w-6 h-6 text-yellow-600" />

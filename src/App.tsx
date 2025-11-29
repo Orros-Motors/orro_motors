@@ -24,7 +24,7 @@ import BookingsManagement from "./admin/BookingsManagement";
 import SettingsTools from "./admin/SettingsTools";
 import AdminLogin from "./admin/AdminLogin";
 import CityManager from "./admin/CityManager";
-
+import Profile from "./pages/Profile/Profile";
 
 function AppContent() {
   const location = useLocation();
@@ -42,6 +42,7 @@ function AppContent() {
           <Route path="/search" element={<TripResults />} />
           <Route path="/book/:tripId" element={<SeatSelection />} />
           <Route path="/confirm" element={<BookingConfirmation />} />
+          <Route path="/profile" element={<Profile />} />
           <Route path="/terms" element={<TermsAndConditionsScreen />} />
           <Route path="/privacy" element={<PrivacyPolicyScreen />} />
           <Route path="/payment-success" element={<PaymentSuccess />} />

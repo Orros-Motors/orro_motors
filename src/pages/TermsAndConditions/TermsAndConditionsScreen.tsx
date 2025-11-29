@@ -115,10 +115,10 @@ const TermsAndConditionsScreen: React.FC = () => {
             <p className="text-sm text-blue-900 text-center">
               <strong>Questions?</strong> Contact us at{" "}
               <a
-                href="mailto:support@orromotors.com"
+                href="mailto:orromottors@gmail.com"
                 className="underline font-medium"
               >
-                support@orromotors.com
+                orromottors@gmail.com
               </a>{" "}
               or call <strong>+234 700 600 0000</strong>
             </p>

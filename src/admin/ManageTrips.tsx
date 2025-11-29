@@ -17,8 +17,8 @@ import {
 import axios from "axios";
 import AdminLayout from "./AdminLayout";
 import TripModals from "./TripModals";
-import { showSuccess, showError } from "../components/Toast/Toast";
 import { baseURL } from "../services/baseurl";
+import { useToast } from "../../src/components/Toast/Toast";
 
 export interface Seat {
   _id: string;
@@ -41,7 +41,7 @@ export interface Trip {
   vehicleType: string;
   pickup: { city: string; location: string };
   dropoff: { city: string; location: string };
-  takeoff: { date: string; time: string };
+  takeoff: { date: string };
   departureTime: string;
   arrivalTime: string;
   seatCount: number;
@@ -50,9 +50,14 @@ export interface Trip {
   seats?: Seat[];
   status?: string;
   tripId?: string;
+  hire?: any;
+  field?: string;
+  label?: string;
+  sub?: undefined;
 }
 
 export default function ManageTrips() {
+  const { addToast } = useToast();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [cities, setCities] = useState<City[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +73,8 @@ export default function ManageTrips() {
     arrivalTime: "",
     pickup: { city: "", location: "" },
     dropoff: { city: "", location: "" },
-    takeoff: { date: "", time: "" },
+    takeoff: { date: "" },
+    hire: "No",
   });
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [viewingTrip, setViewingTrip] = useState<Trip | null>(null);
@@ -91,7 +97,11 @@ export default function ManageTrips() {
       const { data } = await axios.get(`${baseURL}/cities`, axiosConfig);
       if (data.success) setCities(data.data || []);
     } catch (err) {
-      showError("Failed to load cities", "Please refresh");
+      addToast({
+        type: "error",
+        title: "Failed to load cities",
+        message: "Please refresh the page.",
+      });
     }
   };
 
@@ -105,10 +115,11 @@ export default function ManageTrips() {
       );
       if (data.success) setTrips(data.trips.reverse());
     } catch (error: any) {
-      showError(
-        "Failed to load trips",
-        error.response?.data?.message || "Please refresh"
-      );
+      addToast({
+        type: "error",
+        title: "Failed to load trips",
+        message: "Please refresh the page.",
+      });
     } finally {
       setLoading(false);
     }
@@ -124,7 +135,7 @@ export default function ManageTrips() {
   };
 
   const handleNestedChange = (
-    parent: "pickup" | "dropoff" | "takeoff",
+    parent: "pickup" | "dropoff" | "hire" | "takeoff",
     key: "city" | "location" | "date" | "time",
     value: string
   ) => {
@@ -156,7 +167,7 @@ export default function ManageTrips() {
       arrivalTime: "",
       pickup: { city: "", location: "" },
       dropoff: { city: "", location: "" },
-      takeoff: { date: "", time: "" },
+      takeoff: { date: "" },
     });
     setEditingTrip(null);
   };
@@ -173,23 +184,28 @@ export default function ManageTrips() {
       ["pickup.city", "Pickup City"],
       ["dropoff.city", "Dropoff City"],
       ["takeoff.date", "Takeoff Date"],
-      ["takeoff.time", "Takeoff Time"],
+      // removed takeoff.time
     ];
 
     for (const [path, label] of required) {
       const keys = path.split(".");
       let value: any = form;
       for (const k of keys) value = value?.[k];
-      if (!value) {
-        showError("Required", `${label} is missing`);
+      if (!value && value !== 0) {
+        addToast({
+          type: "error",
+          title: "Required",
+          message: `${label} is missing`,
+        });
+
         return false;
       }
     }
     return true;
   };
-
   const handleCreateTrip = async () => {
     console.log(form);
+
     if (!validateForm()) return;
     setActionLoading(true);
     try {
@@ -204,10 +220,19 @@ export default function ManageTrips() {
         setShowForm(false);
         resetForm();
         setConfirmCreate(false);
-        showSuccess("Success!", `"${form.tripName}" launched`);
-      }
+        addToast({
+          type: "success",
+          title: `"${form?.tripName}" launched`,
+          message: `"${form?.tripName}" launched`,
+        });
+        
+     }
     } catch (err: any) {
-      showError("Failed", err.response?.data?.message || "Try again");
+      addToast({
+        type: "error",
+        title: "Failed",
+        message: `${err.response?.data?.message || "Try again"}`,
+      });
     } finally {
       setActionLoading(false);
     }
@@ -231,10 +256,18 @@ export default function ManageTrips() {
         setEditingTrip(null);
         resetForm();
         setConfirmUpdate(false);
-        showSuccess("Updated!", `"${form.tripName}" saved`);
+        addToast({
+          type: "success",
+          title: `"${form?.tripName}" Updated`,
+          message: `"${form?.tripName}" Updated`,
+        });
       }
     } catch (err: any) {
-      showError("Update Failed", err.response?.data?.message || "Try again");
+      addToast({
+        type: "error",
+        title: "Update Failed",
+        message: `${err.response?.data?.message || "Try again"}`,
+      });
     } finally {
       setActionLoading(false);
     }
@@ -250,9 +283,17 @@ export default function ManageTrips() {
       });
       await fetchTrips();
       setDeletingTrip(null);
-      showSuccess("Deleted!", `"${deletingTrip.tripName}" removed`);
+      addToast({
+        type: "success",
+        title: `"${deletingTrip.tripName}" Deleted`,
+        message: `"${deletingTrip.tripName}" Deleted`,
+      });
     } catch {
-      showError("Delete Failed", "Try again");
+      addToast({
+        type: "error",
+        title: "Delete Failed",
+        message: `Try again`,
+      });
     } finally {
       setActionLoading(false);
     }
@@ -278,8 +319,9 @@ export default function ManageTrips() {
       },
       takeoff: {
         date: trip.takeoff?.date || "",
-        time: trip.takeoff?.time || "",
+        //  time: trip.takeoff?.time || "",
       },
+      hire: trip.hire,
     });
   };
 
@@ -525,19 +567,20 @@ export default function ManageTrips() {
                 />
               </div>
 
-              {/* Takeoff Time */}
               <div>
                 <label className="block text-sm font-semibold text-gray-800 mb-2">
-                  Takeoff Time
+                  Hire Bus for Trip
                 </label>
-                <input
-                  type="time"
-                  value={form.takeoff?.time || ""}
-                  onChange={(e) =>
-                    handleNestedChange("takeoff", "time", e.target.value)
-                  }
+
+                <select
+                  value={form.hire || ""}
+                  onChange={(e) => handleChange("hire", e.target.value)}
                   className="w-full px-5 py-4 border-2 border-gray-300 rounded-2xl focus:ring-4 focus:ring-blue-300 outline-none transition text-lg"
-                />
+                >
+                  <option value="">Select an option</option>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </select>
               </div>
             </div>
 
@@ -552,9 +595,19 @@ export default function ManageTrips() {
                 Cancel
               </button>
               <button
-                onClick={() =>
-                  editingTrip ? setConfirmUpdate(true) : setConfirmCreate(true)
-                }
+                onClick={() => {
+                  if (editingTrip) {
+                    setConfirmUpdate(true);
+                  } else if (validateForm()) {
+                    setConfirmCreate(true);
+                  } else {
+                    addToast({
+                      type: "error",
+                      title: "Please Complete Form",
+                      message: `Complete Form pls to proceed`,
+                    });
+                  }
+                }}
                 className="px-10 py-5 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition font-bold text-lg flex items-center gap-3"
               >
                 <CheckCircle className="w-6 h-6" />

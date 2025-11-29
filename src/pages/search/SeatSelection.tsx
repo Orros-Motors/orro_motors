@@ -1,17 +1,15 @@
 // src/pages/SeatSelection.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import {
   Check,
-  Navigation,
   ChevronLeft,
   Sofa,
   Loader2,
   Bus,
   X,
-  Mail,
-  Lock,
+  Phone,
 } from "lucide-react";
 import { baseURL } from "../../services/baseurl";
 
@@ -29,7 +27,6 @@ interface Trip {
   tripId: string;
   pickup: { city: string; location: string };
   dropoff: { city: string; location: string };
-  takeoff: { date: string; time: string };
   departureTime: string;
   arrivalTime: string;
   price: number;
@@ -37,49 +34,44 @@ interface Trip {
   seats: Seat[];
   bus: string;
   vehicleType: string;
+  isHireTrip?: boolean;
 }
 
 const SeatSelection: React.FC = () => {
   const { tripId } = useParams<{ tripId: string }>();
-  //const navigate = useNavigate();
   const [trip, setTrip] = useState<Trip | null>(null);
   const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
   const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
+  const [hireFullBus, setHireFullBus] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
 
-  // Modal States
-  const [showEmailModal, setShowEmailModal] = useState(false);
+  // OTP Modal States
   const [showOtpModal, setShowOtpModal] = useState(false);
-  const [email, setEmail] = useState("");
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phoneNumber: "",
+  });
   const [otp, setOtp] = useState("");
   const [modalLoading, setModalLoading] = useState(false);
   const [modalError, setModalError] = useState("");
 
   useEffect(() => {
-    if (!tripId) {
-      setError("Invalid trip ID");
-      setLoading(false);
-      return;
-    }
+    if (!tripId) return setError("Invalid trip");
 
     const fetchTrip = async () => {
-      setLoading(true);
       try {
-        const response = await axios.post(
-          `${baseURL}/trips/search-trips-by-id`,
-          {
-            ids: [tripId],
-          }
-        );
-        if (response.data.success && response.data.trips[0]) {
-          const fetchedTrip = response.data.trips[0];
-          // Ensure seats are sorted by position (1,2,3...) from index 0
-          fetchedTrip.seats = fetchedTrip.seats.sort(
-            (a: Seat, b: Seat) => a.position - b.position
-          );
-          setTrip(fetchedTrip);
+        const res = await axios.post(`${baseURL}/trips/search-trips-by-id`, {
+          ids: [tripId],
+        });
+        if (res.data.success && res.data.trips[0]) {
+          const fetched = res.data.trips[0];
+          fetched.seats.sort((a: Seat, b: Seat) => a.position - b.position);
+          setTrip(fetched);
+          if (fetched.isHireTrip) setHireFullBus(true);
         } else {
           setError("Trip not found");
         }
@@ -89,11 +81,30 @@ const SeatSelection: React.FC = () => {
         setLoading(false);
       }
     };
-
     fetchTrip();
   }, [tripId]);
 
+  const updateFullHireSelection = useCallback(() => {
+    if (!trip) return;
+    if (hireFullBus) {
+      const available = trip.seats
+        .filter((s) => !s.isBooked && !s.isBooking)
+        .map((s) => ({ pos: s.position, id: s._id }));
+      setSelectedSeats(available.map((s) => s.pos));
+      setSelectedSeatIds(available.map((s) => s.id));
+    } else {
+      setSelectedSeats([]);
+      setSelectedSeatIds([]);
+    }
+  }, [trip, hireFullBus]);
+
+  useEffect(
+    () => updateFullHireSelection(),
+    [hireFullBus, updateFullHireSelection]
+  );
+
   const toggleSeat = (position: number, seatId: string) => {
+    if (hireFullBus || trip?.isHireTrip) return;
     const seat = trip?.seats.find((s) => s.position === position);
     if (!seat || seat.isBooked || seat.isBooking) return;
 
@@ -102,7 +113,6 @@ const SeatSelection: React.FC = () => {
         ? prev.filter((p) => p !== position)
         : [...prev, position]
     );
-
     setSelectedSeatIds((prev) =>
       prev.includes(seatId)
         ? prev.filter((id) => id !== seatId)
@@ -111,83 +121,39 @@ const SeatSelection: React.FC = () => {
   };
 
   const totalPrice = selectedSeats.length * (trip?.price || 0);
+  const availableSeats =
+    trip?.seats.filter((s) => !s.isBooked && !s.isBooking).length || 0;
 
-  const initiatePayment = async () => {
-    if (selectedSeatIds.length === 0) return;
-
-    const userData = localStorage.getItem("user");
-    if (!userData || !trip) return;
-
-    const user = JSON.parse(userData);
-    const token = localStorage.getItem("token");
-
-    setPaymentLoading(true);
-    setModalError("");
-
-    try {
-      localStorage.removeItem("selectedSeatIds");
-      localStorage.setItem("selectedSeatIds", JSON.stringify(selectedSeatIds));
-
-      const payload = {
-        email: user.email,
-        amount:( trip.price * selectedSeatIds.length ),
-        callback_url: `${window.location.origin}/payment-success?email=${user.email}`,
-        seatIds: selectedSeatIds,
-        userId: user._id,
-        tripId: tripId,
-      };
-
-      const res = await axios.post(
-        `${baseURL}/pay/create-paystack-payment`,
-        payload,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      if (res.data.success) {
-        localStorage.setItem("paymentReference", res.data.reference);
-        window.location.href = res.data.authorizationUrl;
-        return;
-      }
-    } catch (err: any) {
-      setModalError(
-        err.response?.data?.error || "Payment initialization failed"
-      );
-    } finally {
-      setPaymentLoading(false);
+  const handleProceed = () => {
+    if (selectedSeatIds.length === 0) {
+      alert("Please select at least one seat");
+      return;
     }
-  };
-
-  const handleProceedToPayment = async () => {
-    const userData = localStorage.getItem("user");
-    if (userData) {
-      try {
-        const user = JSON.parse(userData);
-        if (user.email) {
-          await initiatePayment();
-          return;
-        }
-      } catch (e) {}
-    }
-
-    setShowEmailModal(true);
+    const user = localStorage.getItem("user");
+    if (user) return initiatePayment();
+    setShowOtpModal(true);
   };
 
   const sendOtp = async () => {
-    if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
-      setModalError("Please enter a valid email");
+    if (
+      !formData.firstName ||
+      !formData.lastName ||
+      !formData.email ||
+      !formData.phoneNumber
+    ) {
+      setModalError("All fields are required");
       return;
     }
-
     setModalLoading(true);
     setModalError("");
     try {
-      const res = await axios.post(`${baseURL}/users/send-otp`, { email });
-      if (res.data.success) {
-        setShowEmailModal(false);
-        setShowOtpModal(true);
-      }
+      await axios.post(`${baseURL}/users/send-otp`, {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phoneNumber: formData.phoneNumber,
+      });
+      setModalError("OTP sent to your phone!");
     } catch (err: any) {
       setModalError(err.response?.data?.message || "Failed to send OTP");
     } finally {
@@ -196,17 +162,12 @@ const SeatSelection: React.FC = () => {
   };
 
   const verifyOtp = async () => {
-    if (otp.length !== 6 || !/^\d+$/.test(otp)) {
-      setModalError("Enter valid 6-digit OTP");
-      return;
-    }
-
+    if (otp.length !== 6) return setModalError("Enter 6-digit OTP");
     setModalLoading(true);
-    setModalError("");
     try {
       const res = await axios.post(`${baseURL}/users/verify-otp`, {
-        email,
-        otp,
+        phoneNumber: formData.phoneNumber,
+        otp: otp,
       });
       if (res.data.success) {
         localStorage.setItem("token", res.data.token);
@@ -221,351 +182,301 @@ const SeatSelection: React.FC = () => {
     }
   };
 
-  const FullScreenLoader = () => (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="flex flex-col items-center gap-4">
-        <Loader2 className="w-16 h-16 text-blue-600 animate-spin" />
-        <p className="text-lg text-gray-600 font-medium">
-          Loading trip details...
-        </p>
-      </div>
-    </div>
-  );
+  const initiatePayment = async () => {
+    const user = JSON.parse(localStorage.getItem("user")!);
+    const token = localStorage.getItem("token");
+    setPaymentLoading(true);
+    try {
+      localStorage.setItem("selectedSeatIds", JSON.stringify(selectedSeatIds));
+      const payload = {
+        email: user.email,
+        amount: totalPrice,
+        callback_url: `${window.location.origin}/payment-success`,
+        seatIds: selectedSeatIds,
+        userId: user._id,
+        tripId,
+      };
+      const res = await axios.post(
+        `${baseURL}/pay/create-paystack-payment`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      if (res.data.success) {
+        localStorage.setItem("paymentReference", res.data.reference);
+        window.location.href = res.data.authorizationUrl;
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Payment failed");
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
 
-  if (loading) return <FullScreenLoader />;
-  if (error || !trip) {
+  if (loading)
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-        <div className="bg-white rounded-3xl shadow-xl p-10 text-center max-w-md">
-          <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <X className="w-12 h-12 text-red-600" />
-          </div>
-          <h3 className="text-2xl font-bold mb-3">Trip Unavailable</h3>
-          <p className="text-gray-600 mb-8">{error}</p>
-          <button
-            onClick={() => window.history.back()}
-            className="px-8 py-4 bg-blue-600 text-white rounded-full font-bold hover:bg-blue-700"
-          >
-            Go Back
-          </button>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-12 h-12 text-purple-600 animate-spin" />
       </div>
     );
-  }
-
-  // Sort seats by position (1 to 12) — index 0 = seat 1
-  const sortedSeats = [...trip.seats].sort((a, b) => a.position - b.position);
+  if (error || !trip)
+    return (
+      <div className="min-h-screen flex items-center justify-center text-xl text-red-600">
+        {error || "Trip not found"}
+      </div>
+    );
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-purple-50 pt-20 pb-32 px-4 sm:px-6">
-        <div className="max-w-5xl mx-auto">
-          {/* Trip Header */}
-          <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl p-6 sm:p-8 mb-8 border border-white/50">
-            <div className="flex flex-col sm:flex-row justify-between mb-6 gap-4">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 pt-12 pb-24">
+        <div className="max-w-5xl mx-auto px-4">
+          {/* Header */}
+          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6 mb-6">
+            <div className="flex justify-between items-start">
               <div>
-                <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-3">
-                  <Bus className="w-8 h-8 sm:w-10 sm:h-10 text-blue-600" />
+                <h1 className="text-2xl font-bold flex items-center gap-3">
+                  <Bus className="w-8 h-8 text-purple-600" />
                   {trip.tripName}
                 </h1>
-                <p className="text-sm sm:text-base text-gray-600 mt-1">
-                  Trip ID: {trip.tripId}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs sm:text-sm text-gray-500">Bus Type</p>
-                <p className="text-xl sm:text-2xl font-bold">
-                  {trip.bus} ({trip.vehicleType})
-                </p>
+                {trip.isHireTrip && (
+                  <span className="inline-block mt-2 px-5 py-1 bg-purple-600 text-white text-sm font-bold rounded-full">
+                    FULL BUS HIRE ONLY
+                  </span>
+                )}
               </div>
             </div>
 
-            <div className="hidden md:grid grid-cols-3 gap-6 text-center">
-              <div className="bg-blue-50 rounded-2xl p-5">
-                <p className="text-sm text-blue-700 font-medium">From</p>
-                <p className="text-xl font-bold text-blue-900">
-                  {trip.pickup.city}
-                </p>
-                <p className="text-sm text-blue-600 mt-1">
-                  {trip.pickup.location}
-                </p>
-              </div>
-              <div className="flex items-center justify-center">
-                <div className="text-center">
-                  <p className="text-sm text-gray-500 mt-2">
-                    Departure: {trip.departureTime}
-                  </p>
+            {/* Hire Toggle */}
+            {!trip.isHireTrip && availableSeats > 0 && (
+              <div className="mt-6 p-5 bg-purple-50 rounded-xl border-2 border-purple-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold text-purple-900">
+                      {hireFullBus ? "Full Bus Hired" : "Hire Entire Bus?"}
+                    </h3>
+                    <p className="text-sm text-purple-700">
+                      {hireFullBus
+                        ? `${availableSeats} seats • ₦${(
+                            trip.price * availableSeats
+                          ).toLocaleString()}`
+                        : "Great for groups & events"}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setHireFullBus(!hireFullBus)}
+                    className={`relative w-24 h-12 rounded-full transition-all ${
+                      hireFullBus ? "bg-purple-600" : "bg-gray-300"
+                    }`}
+                  >
+                    <div
+                      className={`absolute top-1 left-1 w-10 h-10 bg-white rounded-full shadow transition-all ${
+                        hireFullBus ? "translate-x-12" : ""
+                      }`}
+                    />
+                  </button>
                 </div>
               </div>
-              <div className="bg-purple-50 rounded-2xl p-5">
-                <p className="text-sm text-purple-700 font-medium">To</p>
-                <p className="text-xl font-bold text-purple-900">
-                  {trip.dropoff.city}
-                </p>
-                <p className="text-sm text-purple-600 mt-1">
-                  {trip.dropoff.location}
-                </p>
-              </div>
-            </div>
-
-            <div className="md:hidden text-center py-4 border-t border-gray-200">
-              <p className="text-lg font-bold text-gray-800">
-                {trip.pickup.city} to {trip.dropoff.city}
-              </p>
-              <p className="text-sm text-gray-600 mt-1">
-                {trip.pickup.location} → {trip.dropoff.location}
-              </p>
-            </div>
+            )}
           </div>
 
-          {/* Seat Map - Dynamic Grid Based on seatCount */}
-          <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl p-6 sm:p-10 mb-8">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-              <h2 className="text-xl sm:text-2xl font-bold">
-                Select Your Seat(s) ({selectedSeats.length} selected)
-              </h2>
-              <p className="text-2xl sm:text-3xl font-bold text-blue-600">
-                ₦{trip.price.toLocaleString()} per seat
-              </p>
-            </div>
+          {/* Seat Grid */}
+          <div className="bg-white/95 backdrop-blur-lg rounded-2xl shadow-xl p-8 mb-8">
+            <h2 className="text-xl font-bold text-center mb-8">
+              {hireFullBus || trip.isHireTrip
+                ? `Full Bus Booked (${availableSeats} seats)`
+                : `Selected: ${selectedSeats.length} seat${
+                    selectedSeats.length !== 1 ? "s" : ""
+                  }`}
+            </h2>
 
-            <div className="relative">
-              <div className="absolute top-4 left-4 bg-gray-800 text-white text-xs font-bold px-4 py-2 rounded-lg z-10">
-                Driver
-              </div>
+            <div
+              className={`grid ${
+                trip.seatCount <= 16 ? "grid-cols-4" : "grid-cols-5"
+              } gap-6 max-w-3xl mx-auto`}
+            >
+              {trip.seats.map((seat) => {
+                const isSelected = selectedSeats.includes(seat.position);
+                const isBooked = seat.isBooked || seat.isBooking;
+                const disabled = isBooked || hireFullBus || trip.isHireTrip;
 
-              {/* Dynamic grid: 5 columns for VIP/Sienna (12 seats), fallback to 25 */}
-              <div
-                className={`grid ${
-                  trip.seatCount <= 16
-                    ? "grid-cols-4 gap-5"
-                    : "grid-cols-5 gap-4"
-                } mt-16 max-w-3xl mx-auto`}
-              >
-                {sortedSeats.map((seat) => {
-                  const isSelected = selectedSeats.includes(seat.position);
-                  const isBooked = seat.isBooked || seat.isBooking;
-
-                  return (
-                    <button
-                      key={seat._id}
-                      onClick={() => toggleSeat(seat.position, seat._id)}
-                      disabled={isBooked}
-                      className="relative group transition-all duration-300 hover:scale-110 disabled:cursor-not-allowed"
+                return (
+                  <button
+                    key={seat._id}
+                    onClick={() => toggleSeat(seat.position, seat._id)}
+                    disabled={disabled}
+                    className="group"
+                  >
+                    <div
+                      className={`w-16 h-16 rounded-2xl border-4 flex items-center justify-center transition-all ${
+                        isSelected
+                          ? "bg-gradient-to-br from-purple-600 to-pink-600 border-purple-700 scale-110"
+                          : isBooked
+                          ? "bg-gray-200 border-gray-400"
+                          : "bg-gray-50 border-gray-300 hover:border-purple-500"
+                      } ${disabled && !isBooked ? "opacity-50" : ""}`}
                     >
-                      <div
-                        className={`w-16 h-16 rounded-2xl border-4 flex items-center justify-center shadow-xl transition-all ${
-                          isSelected
-                            ? "bg-gradient-to-br from-blue-500 to-purple-600 border-purple-700 scale-125"
-                            : isBooked
-                            ? "bg-gray-300 border-gray-400"
-                            : "bg-gradient-to-br from-gray-50 to-gray-100 border-gray-300 hover:border-blue-500 hover:shadow-2xl"
-                        }`}
-                      >
-                        {isSelected ? (
-                          <Check className="w-9 h-9 text-white animate-pulse" />
-                        ) : (
-                          <Sofa
-                            className={`w-10 h-10 ${
-                              isBooked
-                                ? "text-gray-500"
-                                : "text-gray-700 group-hover:text-blue-600"
-                            }`}
-                          />
-                        )}
-                      </div>
-                      <span
-                        className={`absolute -bottom-8 left-1/2 -translate-x-1/2 text-sm font-bold ${
-                          isSelected
-                            ? "text-purple-600"
-                            : isBooked
-                            ? "text-gray-400"
-                            : "text-gray-700"
-                        }`}
-                      >
-                        {seat.position}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+                      {isSelected ? (
+                        <Check className="w-8 h-8 text-white" />
+                      ) : (
+                        <Sofa
+                          className={`w-9 h-9 ${
+                            isBooked ? "text-gray-500" : "text-gray-700"
+                          }`}
+                        />
+                      )}
+                    </div>
+                    <p
+                      className={`text-center mt-2 font-bold ${
+                        isSelected
+                          ? "text-purple-600"
+                          : isBooked
+                          ? "text-gray-400"
+                          : "text-gray-800"
+                      }`}
+                    >
+                      {seat.position}
+                    </p>
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="mt-20 flex flex-wrap justify-center gap-10 text-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-gray-50 to-gray-100 border-4 border-gray-300 rounded-2xl" />
-                <span className="font-medium text-gray-700">Available</span>
+            <div className="mt-10 flex justify-center gap-8 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-gray-50 border-2 border-gray-300 rounded-lg" />
+                <span>Available</span>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gray-300 border-4 border-gray-400 rounded-2xl" />
-                <span className="font-medium text-gray-700">Booked</span>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-gray-300 border-2 border-gray-400 rounded-lg" />
+                <span>Booked</span>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 border-4 border-purple-700 rounded-2xl" />
-                <span className="font-medium text-gray-700">Selected</span>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-purple-600 border-2 border-purple-700 rounded-lg" />
+                <span>Selected</span>
               </div>
             </div>
           </div>
 
           {/* Summary */}
-          <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-3xl p-8 shadow-2xl text-white">
-            <div className="flex flex-col gap-6">
+          <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl p-6 text-white shadow-xl">
+            <div className="flex justify-between items-center">
               <div>
-                <p className="text-base font-medium mb-3 opacity-90">
-                  Your Selection
-                </p>
-                <div className="flex flex-wrap gap-3">
-                  {selectedSeats.length === 0 ? (
-                    <p className="text-white/80 italic">No seats selected</p>
-                  ) : (
-                    selectedSeats
-                      .sort((a, b) => a - b)
-                      .map((pos) => (
-                        <span
-                          key={pos}
-                          className="px-5 py-3 bg-white/25 backdrop-blur-sm rounded-full font-bold text-lg shadow-lg"
-                        >
-                          Seat {pos}
-                        </span>
-                      ))
-                  )}
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-sm opacity-90">Total Amount</p>
-                <p className="text-5xl font-bold">
+                <p className="text-lg opacity-90">Total</p>
+                <p className="text-4xl font-bold">
                   ₦{totalPrice.toLocaleString()}
                 </p>
-                {selectedSeats.length > 0 && (
-                  <p className="text-sm opacity-80 mt-2">
-                    {selectedSeats.length} seat
-                    {selectedSeats.length > 1 ? "s" : ""}
-                  </p>
-                )}
+                {hireFullBus && <p className="text-sm mt-1">Full Bus Hire</p>}
               </div>
+              <button
+                onClick={handleProceed}
+                disabled={selectedSeats.length === 0 || paymentLoading}
+                className={`px-10 py-5 rounded-xl font-bold text-xl transition-all ${
+                  selectedSeats.length === 0
+                    ? "bg-gray-500"
+                    : "bg-white text-purple-700 hover:scale-105 shadow-lg"
+                }`}
+              >
+                {paymentLoading ? (
+                  <Loader2 className="w-8 h-8 animate-spin inline" />
+                ) : (
+                  "Pay Now"
+                )}
+              </button>
             </div>
           </div>
 
-          {/* Buttons */}
-          <div className="mt-10 flex flex-col sm:flex-row gap-4">
-            <button
-              onClick={() => window.history.back()}
-              className="flex items-center justify-center gap-3 px-6 py-4 bg-white text-gray-800 font-bold rounded-full border-2 border-gray-200 hover:border-gray-300 hover:shadow-2xl transition-all group"
-            >
-              <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition" />
-              Back
-            </button>
-
-            <button
-              disabled={selectedSeats.length === 0 || paymentLoading}
-              onClick={handleProceedToPayment}
-              className={`flex-1 flex items-center justify-center gap-3 px-6 py-4 font-bold text-white rounded-full transition-all shadow-2xl ${
-                (selectedSeats.length,
-                paymentLoading
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 hover:scale-105")
-              }`}
-            >
-              {paymentLoading ? (
-                <Loader2 className="w-6 h-6 animate-spin" />
-              ) : (
-                <Navigation className="w-5 h-5" />
-              )}
-              {paymentLoading ? "Processing..." : "Proceed to Payment"}
-              {selectedSeats.length > 0 && !paymentLoading && (
-                <span className="font-bold">({selectedSeats.length})</span>
-              )}
-            </button>
-          </div>
+          <button
+            onClick={() => window.history.back()}
+            className="mt-6 text-gray-600 hover:text-gray-800 flex g- items-center gap-2"
+          >
+            <ChevronLeft className="w-5 h-5" /> Back
+          </button>
         </div>
       </div>
 
-      {/* EMAIL & OTP MODALS */}
-      {showEmailModal && (
+      {/* CLEAN OTP MODAL */}
+      {showOtpModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-bold flex items-center gap-3">
-                <Mail className="w-8 h-8 text-blue-600" />
-                Verify Your Email
+              <h3 className="text-xl font-bold flex items-center gap-3">
+                <Phone className="w-6 h-6 text-purple-600" />
+                Verify Phone Number
               </h3>
-              <button onClick={() => setShowEmailModal(false)}>
-                <X className="w-6 h-6 text-gray-500" />
+              <button onClick={() => setShowOtpModal(false)}>
+                <X className="w-6 h-6" />
               </button>
             </div>
-            <p className="text-gray-600 mb-4">
-              We need your email to complete payment
-            </p>
+
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && sendOtp()}
-              placeholder="you@example.com"
-              className="w-full px-4 py-4 border border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 text-lg"
-              autoFocus
+              placeholder="First Name"
+              value={formData.firstName}
+              onChange={(e) =>
+                setFormData({ ...formData, firstName: e.target.value })
+              }
+              className="w-full px-4 py-3 border rounded-xl mb-3"
             />
-            {modalError && (
-              <p className="text-red-500 text-sm mt-3">{modalError}</p>
-            )}
+            <input
+              placeholder="Last Name"
+              value={formData.lastName}
+              onChange={(e) =>
+                setFormData({ ...formData, lastName: e.target.value })
+              }
+              className="w-full px-4 py-3 border rounded-xl mb-3"
+            />
+            <input
+              placeholder="Email"
+              type="email"
+              value={formData.email}
+              onChange={(e) =>
+                setFormData({ ...formData, email: e.target.value })
+              }
+              className="w-full px-4 py-3 border rounded-xl mb-3"
+            />
+            <input
+              placeholder="Phone Number (e.g. 08012345678)"
+              value={formData.phoneNumber}
+              onChange={(e) =>
+                setFormData({ ...formData, phoneNumber: e.target.value })
+              }
+              className="w-full px-4 py-3 border rounded-xl mb-4"
+            />
+
             <button
               onClick={sendOtp}
               disabled={modalLoading}
-              className="mt-6 w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-xl hover:scale-105 transition flex items-center justify-center gap-3"
+              className="w-full py-3 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700"
             >
-              {modalLoading ? (
-                <Loader2 className="w-6 h-6 animate-spin" />
-              ) : (
-                "Send OTP"
-              )}
+              {modalLoading ? "Sending..." : "Send OTP"}
             </button>
-          </div>
-        </div>
-      )}
 
-      {showOtpModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-bold flex items-center gap-3">
-                <Lock className="w-8 h-8 text-purple-600" />
-                Enter OTP
-              </h3>
-              <button onClick={() => setShowOtpModal(false)}>
-                <X className="w-6 h-6 text-gray-500" />
-              </button>
-            </div>
-            <p className="text-gray-600 mb-4">
-              Check your email: <strong>{email}</strong>
-            </p>
-            <input
-              type="text"
-              value={otp}
-              onChange={(e) =>
-                setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
-              }
-              onKeyDown={(e) =>
-                e.key === "Enter" && otp.length === 6 && verifyOtp()
-              }
-              placeholder="000000"
-              maxLength={6}
-              className="w-full px-4 py-4 text-center text-3xl font-bold tracking-widest border border-gray-300 rounded-xl focus:outline-none focus:border-purple-500"
-              autoFocus
-            />
-            {modalError && (
-              <p className="text-red-500 text-sm mt-3">{modalError}</p>
+            {modalError.includes("sent") && (
+              <>
+                <input
+                  placeholder="Enter 6-digit OTP"
+                  value={otp}
+                  onChange={(e) =>
+                    setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                  }
+                  className="w-full px-4 py-3 text-center text-2xl font-bold tracking-widest border-2 rounded-xl mt-4"
+                  maxLength={6}
+                />
+                <button
+                  onClick={verifyOtp}
+                  disabled={modalLoading || otp.length !== 6}
+                  className="w-full mt-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl"
+                >
+                  Verify & Pay
+                </button>
+              </>
             )}
-            <button
-              onClick={verifyOtp}
-              disabled={modalLoading || otp.length !== 6}
-              className="mt-6 w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl hover:scale-105 transition flex items-center justify-center gap-3 disabled:opacity-50"
-            >
-              {modalLoading ? (
-                <Loader2 className="w-6 h-6 animate-spin" />
-              ) : (
-                "Verify & Pay"
-              )}
-            </button>
+
+            {modalError && !modalError.includes("sent") && (
+              <p className="text-red-500 text-center mt-4 text-sm">
+                {modalError}
+              </p>
+            )}
           </div>
         </div>
       )}

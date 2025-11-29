@@ -106,10 +106,10 @@ const PrivacyPolicyScreen: React.FC = () => {
             <p className="text-sm text-green-900 text-center">
               <strong>Privacy Contact:</strong>{" "}
               <a
-                href="mailto:privacy@orromotors.com"
+                href="mailto:orromottors@gmail.com"
                 className="underline font-medium"
               >
-                privacy@orromotors.com
+                orromottors@gmail.com
               </a>
             </p>
           </div>
