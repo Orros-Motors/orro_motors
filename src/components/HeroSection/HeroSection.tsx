@@ -138,8 +138,8 @@ const HeroSection: React.FC = () => {
         navigate("/search", {
           state: [
             {
-              from: `${from.name}-${(from.terminal)}`,
-              to: `${to.name}-${(to.terminal)}`,
+              from: `${from.name}-${from.terminal}`,
+              to: `${to.name}-${to.terminal}`,
               departureDate,
               trips,
             },
@@ -230,7 +230,7 @@ const HeroSection: React.FC = () => {
                         placeholder="Search city..."
                         value={fromSearch}
                         onChange={(e) => setFromSearch(e.target.value)}
-                        className="w-full px-4 py-2 border-b border-gray-200 focus:outline-none sticky top-0 bg-white"
+                        className="w-full px-4 py-4 border-b border-gray-200 focus:outline-none sticky top-0 bg-white"
                         autoFocus
                       />
                       {filteredFromCities.length > 0 ? (
@@ -239,7 +239,7 @@ const HeroSection: React.FC = () => {
                             key={city._id}
                             type="button"
                             onClick={() => selectFrom(city)}
-                            className="w-full text-left px-4 py-3 hover:bg-blue-50 transition flex justify-between items-center"
+                            className="w-full text-left px-4 py-4 hover:bg-blue-50 transition flex justify-between items-center"
                           >
                             <span className="font-medium">
                               {city.name} - {city.terminal}
@@ -294,7 +294,7 @@ const HeroSection: React.FC = () => {
                         placeholder="Search city..."
                         value={toSearch}
                         onChange={(e) => setToSearch(e.target.value)}
-                        className="w-full px-4 py-2 border-b border-gray-200 focus:outline-none sticky top-0 bg-white"
+                        className="w-full px-4 py-4 border-b border-gray-200 focus:outline-none sticky top-0 bg-white"
                         autoFocus
                       />
                       {filteredToCities.length > 0 ? (
@@ -303,7 +303,7 @@ const HeroSection: React.FC = () => {
                             key={city._id}
                             type="button"
                             onClick={() => selectTo(city)}
-                            className="w-full text-left px-4 py-3 hover:bg-blue-50 transition flex justify-between items-center"
+                            className="w-full text-left px-4 py-4 hover:bg-blue-50 transition flex justify-between items-center"
                           >
                             <span className="font-medium">
                               {city.name} - {city.terminal}
@@ -335,7 +335,8 @@ const HeroSection: React.FC = () => {
                       min={new Date().toISOString().split("T")[0]}
                       onChange={(e) => setDepartureDate(e.target.value)}
                       required
-                      className="w-full px-4 py-3 pl-12 bg-gray-50 border border-gray-200 rounded-2xl text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                      className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-gray-700 text-left focus:outline-none focus:ring-2 focus:ring-blue-500 transition appearance-none"
+                      style={{ textAlign: "left" }}
                     />
                     <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
                   </div>

@@ -14,7 +14,7 @@ const OrroNavbar: React.FC = () => {
             <div className="flex items-center space-x-2">
               <img src={orro} alt="Orro Motors Logo" className="w-12 h-12" />
               <span className="text-blue-500 text-xl font-semibold">
-                Orro Motors
+                ORRO Motors
               </span>
             </div>
           </a>

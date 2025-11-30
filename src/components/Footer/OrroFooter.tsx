@@ -23,7 +23,7 @@ const OrroFooter: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2 mb-3">
             <img src={second} alt="Orro Motors" className="w-12 h-12" />
-            <h3 className="text-xl font-bold">Orro Motors</h3>
+            <h3 className="text-xl font-bold">ORRO Motors</h3>
           </div>
           <p className="text-sm max-w-xs">
             Your trusted travel partner for comfortable and safe journeys across

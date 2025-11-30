@@ -227,6 +227,8 @@ const SeatSelection: React.FC = () => {
   // seats that are fully paid
   const paidSeats = trip?.seats.filter((seat) => seat.isPaid).length || 0;
 
+
+  //screenShareInfo.userId !== userId 
   // seats available
   //const availableSeats = totalSeats - (bookedSeats + paidSeats);
 
