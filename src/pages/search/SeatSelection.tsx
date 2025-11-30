@@ -2,15 +2,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
-import {
-  Check,
-  ChevronLeft,
-  Sofa,
-  Loader2,
-  Bus,
-  X,
-  Phone,
-} from "lucide-react";
+import { Check, ChevronLeft, Sofa, Loader2, Bus, X, Phone } from "lucide-react";
 import { baseURL } from "../../services/baseurl";
 
 interface Seat {
@@ -227,9 +219,20 @@ const SeatSelection: React.FC = () => {
       </div>
     );
 
+  const totalSeats = trip?.seatCount || 0;
+
+  // seats that are booked (selected by others but not yet paid)
+  const bookedSeats = trip?.seats.filter((seat) => seat.isBooking).length || 0;
+
+  // seats that are fully paid
+  const paidSeats = trip?.seats.filter((seat) => seat.isPaid).length || 0;
+
+  // seats available
+  //const availableSeats = totalSeats - (bookedSeats + paidSeats);
+
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 pt-12 pb-24">
+      <div className="min-h-screen pt-[140px] bg-gradient-to-br from-blue-50 to-purple-50 pt-12 pb-24">
         <div className="max-w-5xl mx-auto px-4">
           {/* Header */}
           <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-6 mb-6">
@@ -283,8 +286,10 @@ const SeatSelection: React.FC = () => {
           {/* Seat Grid */}
           <div className="bg-white/95 backdrop-blur-lg rounded-2xl shadow-xl p-8 mb-8">
             <h2 className="text-xl font-bold text-center mb-8">
-              {hireFullBus || trip.isHireTrip
-                ? `Full Bus Booked (${availableSeats} seats)`
+              {hireFullBus ||
+              trip.isHireTrip ||
+              bookedSeats + paidSeats >= totalSeats
+                ? `Full Bus Booked (${totalSeats} seats)`
                 : `Selected: ${selectedSeats.length} seat${
                     selectedSeats.length !== 1 ? "s" : ""
                   }`}
